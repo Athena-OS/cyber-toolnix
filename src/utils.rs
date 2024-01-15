@@ -1,6 +1,7 @@
 use std::process::{Command, exit, Stdio};
-use std::io::{self, Write};
-use std::env;
+use std::io::{self, Write, BufRead};
+use std::{env, str};
+use std::fs::File;
 
 pub fn print_banner() -> Result<(), Box<dyn std::error::Error>> {
     let encoded = "H4sIAAAAAAAAA7XSTQ6DIBAF4D2nmE0bQxq4Avc/VQMiDD+Db2hlgQr4PgYl2mnhaltvk/lB3Je16kCmZh9V52Zs/jlVRpXnrFGXqIpVqDeohsXVW1TBwiqA4iyqQijMgiqIoiymwijIQqqU/qj6mibn2y0WUYVINmrZEvcfVayhLxEv1pSApVqf3rOPGfhiMehTJs2wa+py+qSVmabrvZXWnqob5tq4EA7R7c9lBD3753KtnUTnxfKhsQhqQ0ppdY5vjX0Uf14Mmz765Y2KtyGmZOXReMIp2Ka+rldTiw2UnlzszRejmEcVIQoAAA==";
@@ -89,6 +90,7 @@ pub fn exec_eval(
 }
 
 pub fn set_role (role: &str, config_file: &str) {
+    let target_string = format!("./modules/roles/{}", role);
     exec_eval(
         exec(
             "sudo",
@@ -101,6 +103,26 @@ pub fn set_role (role: &str, config_file: &str) {
         ),
         "Set the role",
     );
+    
+    match check_string_in_file(config_file, &target_string) {
+        Ok(true) => println!("Find path to role in configuration file."),
+        Ok(false) => {
+            println!("Role path not found in configuration file. Creating it...");
+            exec_eval(
+                exec(
+                    "sudo",
+                    vec![
+                        String::from("sed"),
+                        String::from("-i"),
+                        format!("    \];/      .\/modules\/roles\/{}\n    \];/g", role),
+                        config_file.to_string(),
+                    ],
+                ),
+                "Add missing role module path",
+            );
+        }
+        Err(e) => eprintln!("Error: {}", e),
+    }
     exec_eval(
         exec(
             "sudo",
@@ -116,4 +138,18 @@ pub fn set_role (role: &str, config_file: &str) {
 pub fn crash<S: AsRef<str>>(a: S, b: i32) -> ! {
     println!("{}", a.as_ref());
     exit(b);
+}
+
+fn check_string_in_file(file_path: &str, target_string: &str) -> io::Result<bool> {
+    let file = File::open(file_path)?;
+    let reader = io::BufReader::new(file);
+
+    for line in reader.lines() {
+        let line_content = line?;
+        if line_content.contains(target_string) {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
