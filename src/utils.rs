@@ -114,7 +114,7 @@ pub fn set_role (role: &str, config_file: &str) {
                     vec![
                         String::from("sed"),
                         String::from("-i"),
-                        format!("    \];/      .\/modules\/roles\/{}\n    \];/g", role),
+                        format!(r"s/    \];/      .\/modules\/roles\/{}\n    \];/g", role),
                         config_file.to_string(),
                     ],
                 ),
@@ -123,6 +123,7 @@ pub fn set_role (role: &str, config_file: &str) {
         }
         Err(e) => eprintln!("Error: {}", e),
     }
+    println!("\nSetting {} role...\n", role);
     exec_eval(
         exec(
             "sudo",

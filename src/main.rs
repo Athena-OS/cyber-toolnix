@@ -30,7 +30,6 @@ fn main() {
 
     match args[1].as_str() {
         "blue" | "bounty" | "cracker" | "dos" | "forensic" | "malware" | "mobile" | "network" | "osint" | "red" | "student" | "web" => {
-            println!("\nSetting {} role...\n", args[1].as_str());
             set_role(args[1].as_str(), &config_file);
         }
         _ => {
