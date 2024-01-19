@@ -9,7 +9,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let config_file = format!("/etc/nixos/configuration.nix");
 
-    if !file_exists(&config_file) {
+    if !path_exists(&config_file) {
         println!("File does not exist: {}", config_file);
         return;
     }
@@ -30,7 +30,20 @@ fn main() {
 
     match args[1].as_str() {
         "blue" | "bounty" | "cracker" | "dos" | "forensic" | "malware" | "mobile" | "network" | "osint" | "red" | "student" | "web" => {
-            set_role(args[1].as_str(), &config_file);
+            if args.len() > 2 && args.len() < 5 && (args[2].as_str() == "-I") {
+                set_role(args[1].as_str(), args[3].as_str()); // args[3] is the configuration.nix path
+            }
+            else {
+                set_role(args[1].as_str(), &config_file);
+            }
+        }
+        "-I" => {
+            if args.len() > 2 && args.len() < 5 {
+                set_role(args[3].as_str(), &config_file);
+            }
+            else {
+                println!("Usage: {} -I <path/to/configuration.nix> <role>", args[0]);
+            }
         }
         _ => {
             println!("Invalid command: {}", args[1]);
@@ -65,15 +78,8 @@ fn main() {
             "Delete commented lines from file",
         );
     }
-    println!("All done. Your role has been set!");
     
     let mut input = String::new();
     println!("Press Enter to continue");
     stdin().read_line(&mut input).expect("Failed to read input");
-}
-
-fn file_exists(path: &str) -> bool {
-    fs::metadata(path)
-        .map(|metadata| metadata.is_file())
-        .unwrap_or(false)
 }

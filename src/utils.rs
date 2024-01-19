@@ -1,7 +1,8 @@
 use std::process::{Command, exit, Stdio};
 use std::io::{self, Write, BufRead};
-use std::{env, str};
+use std::{env, fs, str};
 use std::fs::File;
+use std::path::Path;
 
 pub fn print_banner() -> Result<(), Box<dyn std::error::Error>> {
     let encoded = "H4sIAAAAAAAAA7XSTQ6DIBAF4D2nmE0bQxq4Avc/VQMiDD+Db2hlgQr4PgYl2mnhaltvk/lB3Je16kCmZh9V52Zs/jlVRpXnrFGXqIpVqDeohsXVW1TBwiqA4iyqQijMgiqIoiymwijIQqqU/qj6mibn2y0WUYVINmrZEvcfVayhLxEv1pSApVqf3rOPGfhiMehTJs2wa+py+qSVmabrvZXWnqob5tq4EA7R7c9lBD3753KtnUTnxfKhsQhqQ0ppdY5vjX0Uf14Mmz765Y2KtyGmZOXReMIp2Ka+rldTiw2UnlzszRejmEcVIQoAAA==";
@@ -46,6 +47,7 @@ pub fn get_help() {
     println!("Set your Cyber Security role.");
     println!();
     println!("Options:");
+    println!("-I                              Specify configuration.nix path (default: /etc/nixos/configuration.nix).");
     println!("blue                            Set Blue Teamer role.");
     println!("bugbounty                       Set Bug Bounty Hunter role.");
     println!("cracker                         Set Cracker Specialist role.");
@@ -63,8 +65,8 @@ pub fn get_help() {
     println!("{}", env::args().next().unwrap());
     println!("{} blue", env::args().next().unwrap());
     println!("{} red", env::args().next().unwrap());
-    println!("{} osint", env::args().next().unwrap());
-    println!("{} student", env::args().next().unwrap());
+    println!("{} -I ./nix/configuration.nix osint", env::args().next().unwrap());
+    println!("{} student -I athena-nix/nixos/configuration.nix", env::args().next().unwrap());
 }
 
 pub fn exec(command: &str, args: Vec<String>) -> Result<std::process::ExitStatus, std::io::Error> {
@@ -90,31 +92,66 @@ pub fn exec_eval(
 }
 
 pub fn set_role (role: &str, config_file: &str) {
-    let target_string = format!("./modules/roles/{}", role);
-    exec_eval(
-        exec(
-            "sudo",
-            vec![
-                String::from("sed"),
-                String::from("-i"),
-                format!("s/role =.*/role = \"{}\";/g", role),
-                config_file.to_string(),
-            ],
-        ),
-        "Set the role",
-    );
+
+    let directory_str;
+
+    if let Some(directory) = Path::new(config_file).parent() {
+        if let Some(parent_str) = directory.to_str() {
+            directory_str = parent_str.to_string();
+            println!("Directory: {}", directory_str);
+        } else {
+            eprintln!("Failed to convert directory to string.");
+            return;
+        }
+    } else {
+        eprintln!("Invalid file path: {}", config_file);
+        return;
+    }
+
+    let mut target_dir = format!("{}/modules/roles/", directory_str);
+    let mut target_string = "./modules/roles/";
+    let mut target_sed = r".\/modules\/roles\/";
+
+    if path_exists(&target_dir) {
+        println!("The path {} exists!", target_dir);
+    } else {
+        println!("The path {} does not exist. Searching on parent directory...", target_dir);
+        target_dir = format!("{}/../modules/roles/", directory_str);
+        target_string = "../modules/roles/";
+        target_sed = r"..\/modules\/roles\/";
+        if path_exists(&target_dir) {
+            println!("The path {} exists!", target_dir);
+        } else {
+            println!("The path {} does not exist. Get roles module files and retry!", target_dir);
+            return;
+        }
+    }
     
     match check_string_in_file(config_file, &target_string) {
-        Ok(true) => println!("Find path to role in configuration file."),
+        Ok(true) => {
+            exec_eval(
+                exec(
+                    "sed",
+                    vec![
+                        String::from("-i"),
+                        String::from("-e"),
+                        format!(r"s/#{}/{}{}/g",target_sed, target_sed, role), // Uncomment role module line if commented
+                        String::from("-e"),
+                        format!(r"s/{}.*/{}{}/g", target_sed, target_sed, role),
+                        config_file.to_string(),
+                    ],
+                ),
+                "Add missing role module path",
+            );
+        }
         Ok(false) => {
             println!("Role path not found in configuration file. Creating it...");
             exec_eval(
                 exec(
-                    "sudo",
+                    "sed",
                     vec![
-                        String::from("sed"),
                         String::from("-i"),
-                        format!(r"s/    \];/      .\/modules\/roles\/{}\n    \];/g", role),
+                        format!(r"s/hardware-configuration.nix/hardware-configuration.nix\n      {}{}/g", target_sed, role),
                         config_file.to_string(),
                     ],
                 ),
@@ -130,10 +167,13 @@ pub fn set_role (role: &str, config_file: &str) {
             vec![
                 String::from("nixos-rebuild"),
                 String::from("switch"),
+                String::from("-I"),
+                format!("nixos-config={}", config_file),
             ],
         ),
         "Set the role",
     );
+    //println!("All done. Your role has been set!");
 }
 
 pub fn crash<S: AsRef<str>>(a: S, b: i32) -> ! {
@@ -153,4 +193,12 @@ fn check_string_in_file(file_path: &str, target_string: &str) -> io::Result<bool
     }
 
     Ok(false)
+}
+
+pub fn path_exists(path: &str) -> bool {
+    if let Ok(metadata) = fs::metadata(path) {
+        metadata.is_dir() || metadata.is_file()
+    } else {
+        false
+    }
 }
