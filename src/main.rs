@@ -29,7 +29,7 @@ fn main() {
     let _ = print_banner();
 
     match args[1].as_str() {
-        "blue" | "bounty" | "cracker" | "dos" | "forensic" | "malware" | "mobile" | "network" | "osint" | "red" | "student" | "web" => {
+        "blue" | "bugbounty" | "cracker" | "dos" | "forensic" | "malware" | "mobile" | "network" | "osint" | "red" | "student" | "web" => {
             if args.len() > 2 && args.len() < 5 && (args[2].as_str() == "-I") {
                 set_role(args[1].as_str(), args[3].as_str()); // args[3] is the configuration.nix path
             }
